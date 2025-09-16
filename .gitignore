@@ -3,9 +3,6 @@
 .RData
 .Ruserdata
 
-# 'data' folder #
-data/
-
 # Common text files that may contain data #
 *.[cC][sS][vV]
 *.[tT][xX][tT]
