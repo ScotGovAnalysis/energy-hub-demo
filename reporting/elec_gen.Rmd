@@ -1,0 +1,141 @@
+---
+title: Electricity Generation
+output: 
+  html_document:
+    dev: svg
+    fig_width: 8
+    fig_height: 5
+---
+
+This page replicates content currently available on the [Electricity Generation](https://scotland.shinyapps.io/Energy/?Section=RenLowCarbon&Subsection=RenElec&Chart=ElecGen) page of the Shiny app.
+
+```{r setup, include = FALSE}
+source(here::here("reporting", "00_reporting-setup.R"))
+
+elec_gen <- read_rds(here("data", "processed", "elec_gen.rds"))
+
+limits_pretty <- function(x, ..., include_zero = TRUE) {
+  breaks <- pretty(x, ...)
+  if (include_zero) c(0, max(breaks)) else range(breaks)
+}
+
+library(ggrepel)
+line <- function(data, fuels) {
+  
+  data <- 
+    data %>%
+    filter(region == "Scotland" & fuel %in% fuels)
+  
+  ggplot(data, aes(x = year, y = prop)) +
+    geom_line(aes(colour = fuel),
+              linewidth = 1) +
+    scale_y_continuous(labels = scales::percent,
+                       limits = limits_pretty,
+                       expand = c(0, 0)) +
+    coord_cartesian(clip = "off") +
+    labs(x = NULL, y = NULL, colour = NULL)
+}
+```
+
+## Charts
+
+### Low carbon versus fossil fuels
+
+#### Scotland, `r str_glue("{min(elec_gen$year)} to {max(elec_gen$year)}")`
+
+```{r low-carbon-fossils}
+line(elec_gen, c("Low Carbon", "Fossil Fuels"))
+```
+
+### Nuclear versus renewables
+
+#### Scotland, `r str_glue("{min(elec_gen$year)} to {max(elec_gen$year)}")`
+
+```{r nuclear-renewables}
+line(elec_gen, c("Renewables", "Nuclear"))
+```
+
+## Commentary
+
+```{r commentary, include = FALSE}
+com <- 
+  elec_gen %>%
+  filter(region == "Scotland" &
+           year %in% c(min(year), max(year)) &
+           fuel %in% 
+           c("Renewables", "Nuclear", "Pumped Hydro", "Low Carbon")) %>%
+  mutate(value_twh = sprintf("%1.1f",
+                             round_half_up(value / 1000, 1)),
+         perc = round_half_up(prop * 100, 0))
+
+renewables <- com %>% filter(fuel == "Renewables")
+other <- com %>% filter(year == max(year) & fuel != "Renewables")
+```
+
+The following is an example of automatically generated commentary. Automated figures are in bold.
+
+> In **`r min(com$year)`**, Scotland generated **`r renewables %>% filter(year == min(year)) %>% pull(value_twh)`** Twh from renewable sources. In **`r max(com$year)`**, increased capacity meant that **`r renewables %>% filter(year == max(year)) %>% pull(value_twh)`** Twh of electricity was generated from renewable sources, **`r renewables %>% filter(year == max(year)) %>% pull(perc)`**% of all electricity generated in Scotland. In **`r max(other$year)`**, a further **`r other %>% filter(fuel == "Nuclear") %>% pull(value_twh)`** TWh was generated from nuclear sources and **`r other %>% filter(fuel == "Pumped Hydro") %>% pull(value_twh)`** TWh from pumped storage resulting in the highest ever (not guaranteed to be true) proportion (**`r other %>% filter(fuel == "Low Carbon") %>% pull(perc)`**%) of Scotland's electricity generated from low-carbon sources.
+
+## Data Tables {.tabset}
+
+### Scotland
+
+```{r scotland}
+elec_gen %>%
+  filter(region == "Scotland") %>%
+  select(year, fuel, value) %>%
+  mutate(value = vec_fmt_number(value, decimals = 0)) %>%
+  pivot_wider(names_from = fuel) %>%
+  arrange(desc(year)) %>%
+  gt() %>%
+  cols_label(year = "Year") %>%
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = list(
+      cells_column_labels(columns = Total),
+      cells_body(columns = Total)
+    )
+  )
+```
+
+### Scotland Proportion
+
+```{r scotland-proportions}
+elec_gen %>%
+  filter(region == "Scotland" &
+           fuel %in% c("Renewables", "Nuclear", "Pumped Hydro",
+                       "Low Carbon", "Fossil Fuels")) %>%
+  select(year, fuel, value, prop) %>%
+  mutate(value = vec_fmt_number(value, decimals = 0),
+         prop = vec_fmt_percent(prop, decimals = 1)) %>%
+  pivot_longer(cols = c("value", "prop")) %>%
+  mutate(
+    name = case_match(name, "value" ~ "GWh", "prop" ~ "%"),
+    name = str_glue("{fuel} ({name})")
+  ) %>%
+  select(-fuel) %>%
+  pivot_wider(names_from = name, values_from = value) %>%
+  arrange(desc(year)) %>%
+  gt() %>%
+  cols_label(year = "Year")
+```
+
+### England & Wales
+
+```{r england-wales}
+elec_gen %>%
+  filter(region == "England & Wales") %>%
+  select(year, fuel, value) %>%
+  mutate(value = vec_fmt_number(value, decimals = 0)) %>%
+  pivot_wider(names_from = fuel) %>%
+  arrange(desc(year)) %>%
+  gt() %>%
+  cols_label(year = "Year") %>%
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = list(
+      cells_column_labels(columns = Total),
+      cells_body(columns = Total)
+    )
+  )
+```
